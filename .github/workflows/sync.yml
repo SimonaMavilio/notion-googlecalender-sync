@@ -1,17 +1,23 @@
 name: Notion-Calendar Sync
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: {}
+  schedule:
+    # Runs every 15 minutes (cron is UTC)
+    - cron: "*/15 * * * *"
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    concurrency:
+      group: notion-gcal-sync
+      cancel-in-progress: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
