@@ -170,23 +170,39 @@ def sync_notion_to_calendar():
             continue
 
     # --- DELETE EVENTS NO LONGER IN NOTION ---
-    try:
-        gcal_events = service.events().list(
-            calendarId=CALENDAR_ID,
-            privateExtendedProperty="notion_id"
-        ).execute().get('items', [])
 
-        for g_event in gcal_events:
-            notion_id = g_event['extendedProperties']['private'].get('notion_id')
-            if notion_id and notion_id not in notion_ids:
-                service.events().delete(
-                    calendarId=CALENDAR_ID,
-                    eventId=g_event['id']
-                ).execute()
-                print(f"🗑️ Deleted event (no longer in Notion): {g_event.get('summary')}")
-                deleted_count += 1
-    except Exception as e:
-        print(f"❌ Error during deletion sync: {e}")
+
+try:
+    print("🔍 Checking for events to delete...")
+
+    # Get all events from the calendar (we'll filter manually)
+    gcal_events = service.events().list(
+        calendarId=CALENDAR_ID,
+        maxResults=2500  # Adjust if you have more events
+    ).execute().get('items', [])
+
+    # Filter for events that have our notion_id extended property
+    synced_events = []
+    for event in gcal_events:
+        extended_props = event.get('extendedProperties', {}).get('private', {})
+        if 'notion_id' in extended_props:
+            synced_events.append(event)
+
+    print(f"🔍 Found {len(synced_events)} previously synced events")
+
+    # Delete events whose notion_id is no longer in our Notion DB
+    for g_event in synced_events:
+        notion_id = g_event['extendedProperties']['private']['notion_id']
+        if notion_id not in notion_ids:
+            service.events().delete(
+                calendarId=CALENDAR_ID,
+                eventId=g_event['id']
+            ).execute()
+            print(f"🗑️ Deleted event (no longer in Notion): {g_event.get('summary', 'Untitled')}")
+            deleted_count += 1
+
+except Exception as e:
+    print(f"❌ Error during deletion sync: {e}")
 
     print(f"""
     🎉 Sync complete!
@@ -195,7 +211,6 @@ def sync_notion_to_calendar():
     Skipped: {skipped_count}
     Deleted: {deleted_count}
     """)
-
 
 if __name__ == "__main__":
     sync_notion_to_calendar()
