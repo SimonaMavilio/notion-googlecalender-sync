@@ -1,7 +1,7 @@
 import requests
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -28,20 +28,10 @@ def get_notion_items():
         'Content-Type': 'application/json'
     }
 
-    # Query for items modified in last 24 hours
-    filter_data = {
-        "filter": {
-            "timestamp": "last_edited_time",
-            "last_edited_time": {
-                "past_week": {}
-            }
-        }
-    }
-
     response = requests.post(
         f'https://api.notion.com/v1/databases/{NOTION_DB_ID}/query',
         headers=headers,
-        json=filter_data
+        json={}
     )
 
     if response.status_code == 200:
@@ -52,43 +42,59 @@ def get_notion_items():
         return []
 
 def notion_to_calendar_event(notion_item):
-    """Convert Notion database item to Google Calendar event"""
+    """Convert Notion item to Google Calendar event"""
     properties = notion_item.get('properties', {})
 
-    # Extract title (adjust property name as needed)
+    # Titel
     title = "Untitled Event"
-    if 'Name' in properties or 'Title' in properties:
-        title_prop = properties.get('Name') or properties.get('Title')
+    if 'Name' in properties:
+        title_prop = properties['Name']
         if title_prop['type'] == 'title' and title_prop['title']:
             title = title_prop['title'][0]['plain_text']
 
-    # Extract date (adjust property name as needed)
+    # Datum/Zeiten
     start_time = None
     end_time = None
+    is_all_day = False
 
     if 'Date' in properties:
         date_prop = properties['Date']
         if date_prop['type'] == 'date' and date_prop['date']:
             start_time = date_prop['date']['start']
-            end_time = date_prop['date'].get('end', start_time)
+            end_time = date_prop['date'].get('end')
 
-    # Create calendar event
+            # Fall 1/2: Ganztags (Format = YYYY-MM-DD)
+            if len(start_time) == 10:
+                is_all_day = True
+                if not end_time:
+                    # kein Enddatum → +1 Tag
+                    end_date = datetime.strptime(start_time, "%Y-%m-%d") + timedelta(days=1)
+                    end_time = end_date.strftime("%Y-%m-%d")
+
+    if not start_time:
+        return None
+
+    # Event für Google erstellen
     event = {
         'summary': title,
         'description': f"Synced from Notion: {notion_item['url']}",
-        'start': {
-            'dateTime': start_time,
-            'timeZone': 'UTC',
-        },
-        'end': {
-            'dateTime': end_time,
-            'timeZone': 'UTC',
-        },
-        'source': {
-            'title': 'Notion',
-            'url': notion_item['url']
-        }
     }
+
+    if is_all_day:
+        event['start'] = {'date': start_time}
+        event['end'] = {'date': end_time}
+    else:
+        # Fall 3: Nur Startzeit → Default Endzeit = +1h
+        if not end_time:
+            try:
+                dt_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+                dt_end = dt_start + timedelta(hours=1)
+                end_time = dt_end.isoformat()
+            except:
+                end_time = start_time
+
+        event['start'] = {'dateTime': start_time}
+        event['end'] = {'dateTime': end_time}
 
     return event
 
@@ -96,7 +102,6 @@ def sync_notion_to_calendar():
     """Main sync function"""
     print("🔄 Starting Notion → Google Calendar sync...")
 
-    # Get Notion items
     notion_items = get_notion_items()
     print(f"📋 Found {len(notion_items)} Notion items")
 
@@ -104,7 +109,6 @@ def sync_notion_to_calendar():
         print("✅ No items to sync")
         return
 
-    # Initialize Google Calendar service
     try:
         service = get_google_calendar_service()
         print("🔗 Connected to Google Calendar")
@@ -112,35 +116,19 @@ def sync_notion_to_calendar():
         print(f"❌ Failed to connect to Google Calendar: {e}")
         return
 
-    # Sync each item
     synced_count = 0
     for item in notion_items:
         try:
-            # Convert to calendar event
             event = notion_to_calendar_event(item)
-
-            if not event['start'].get('dateTime'):
-                print(f"⏭️  Skipping item without date: {event['summary']}")
+            if not event:
+                print("⏭️  Skipping item without valid date")
                 continue
 
-            # Check if event already exists (basic duplicate prevention)
-            existing_events = service.events().list(
-                calendarId=CALENDAR_ID,
-                q=event['summary'],
-                timeMin=event['start']['dateTime'],
-                timeMax=event['end']['dateTime']
-            ).execute()
-
-            if existing_events.get('items'):
-                print(f"⏭️  Event already exists: {event['summary']}")
-                continue
-
-            # Create the event
+            # Kein Duplicate-Check → immer ein Event erstellen
             created_event = service.events().insert(
                 calendarId=CALENDAR_ID,
                 body=event
             ).execute()
-
             print(f"✅ Created event: {event['summary']}")
             synced_count += 1
 
