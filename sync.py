@@ -104,13 +104,15 @@ def notion_to_calendar_event(notion_item):
 
 
 def sync_notion_to_calendar():
-    print("🔄 Starting Notion → Google Calendar sync...")
+    print("🔄 Starting Notion ↔ Google Calendar sync...")
 
     notion_items = get_notion_items()
     print(f"📋 Found {len(notion_items)} Notion items")
 
+    notion_ids = set(item['id'] for item in notion_items)
+
     if not notion_items:
-        print("✅ No items to sync")
+        print("⚠️ No Notion items found, nothing to sync.")
         return
 
     try:
@@ -123,31 +125,31 @@ def sync_notion_to_calendar():
     created_count = 0
     updated_count = 0
     skipped_count = 0
+    deleted_count = 0
 
+    # --- CREATE or UPDATE ---
     for item in notion_items:
         try:
             event = notion_to_calendar_event(item)
             if not event:
-                print("⏭️  Skipping item without valid date")
+                print("⏭️ Skipping item without valid date")
                 skipped_count += 1
                 continue
 
             notion_id = item['id']
-            # Attach Notion ID to the event
-            event['extendedProperties'] = {
-                'private': {'notion_id': notion_id}
-            }
+            # Always attach the Notion ID
+            event['extendedProperties'] = {'private': {'notion_id': notion_id}}
 
-            # Check if event already exists
+            # Look for existing event
             existing = service.events().list(
                 calendarId=CALENDAR_ID,
                 privateExtendedProperty=f"notion_id={notion_id}"
             ).execute().get('items', [])
 
             if existing:
-                # Update the existing event
+                # Update
                 existing_event_id = existing[0]['id']
-                updated_event = service.events().update(
+                service.events().update(
                     calendarId=CALENDAR_ID,
                     eventId=existing_event_id,
                     body=event
@@ -155,8 +157,8 @@ def sync_notion_to_calendar():
                 print(f"🔄 Updated event: {event['summary']}")
                 updated_count += 1
             else:
-                # Create a new one
-                created_event = service.events().insert(
+                # Create
+                service.events().insert(
                     calendarId=CALENDAR_ID,
                     body=event
                 ).execute()
@@ -167,7 +169,32 @@ def sync_notion_to_calendar():
             print(f"❌ Error syncing item: {e}")
             continue
 
-    print(f"🎉 Sync complete! Created {created_count}, Updated {updated_count}, Skipped {skipped_count}")
+    # --- DELETE EVENTS NO LONGER IN NOTION ---
+    try:
+        gcal_events = service.events().list(
+            calendarId=CALENDAR_ID,
+            privateExtendedProperty="notion_id"
+        ).execute().get('items', [])
+
+        for g_event in gcal_events:
+            notion_id = g_event['extendedProperties']['private'].get('notion_id')
+            if notion_id and notion_id not in notion_ids:
+                service.events().delete(
+                    calendarId=CALENDAR_ID,
+                    eventId=g_event['id']
+                ).execute()
+                print(f"🗑️ Deleted event (no longer in Notion): {g_event.get('summary')}")
+                deleted_count += 1
+    except Exception as e:
+        print(f"❌ Error during deletion sync: {e}")
+
+    print(f"""
+    🎉 Sync complete!
+    Created: {created_count}
+    Updated: {updated_count}
+    Skipped: {skipped_count}
+    Deleted: {deleted_count}
+    """)
 
 
 if __name__ == "__main__":
