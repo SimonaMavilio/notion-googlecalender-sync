@@ -104,6 +104,7 @@ def notion_to_calendar_event(notion_item):
 
 
 def sync_notion_to_calendar():
+    """Main sync function"""
     print("🔄 Starting Notion ↔ Google Calendar sync...")
 
     notion_items = get_notion_items()
@@ -170,47 +171,46 @@ def sync_notion_to_calendar():
             continue
 
     # --- DELETE EVENTS NO LONGER IN NOTION ---
+    try:
+        print("🔍 Checking for events to delete...")
 
+        # Get all events from the calendar (we'll filter manually)
+        gcal_events = service.events().list(
+            calendarId=CALENDAR_ID,
+            maxResults=2500  # Adjust if you have more events
+        ).execute().get('items', [])
 
-try:
-    print("🔍 Checking for events to delete...")
+        # Filter for events that have our notion_id extended property
+        synced_events = []
+        for event in gcal_events:
+            extended_props = event.get('extendedProperties', {}).get('private', {})
+            if 'notion_id' in extended_props:
+                synced_events.append(event)
 
-    # Get all events from the calendar (we'll filter manually)
-    gcal_events = service.events().list(
-        calendarId=CALENDAR_ID,
-        maxResults=2500  # Adjust if you have more events
-    ).execute().get('items', [])
+        print(f"🔍 Found {len(synced_events)} previously synced events")
 
-    # Filter for events that have our notion_id extended property
-    synced_events = []
-    for event in gcal_events:
-        extended_props = event.get('extendedProperties', {}).get('private', {})
-        if 'notion_id' in extended_props:
-            synced_events.append(event)
+        # Delete events whose notion_id is no longer in our Notion DB
+        for g_event in synced_events:
+            notion_id = g_event['extendedProperties']['private']['notion_id']
+            if notion_id not in notion_ids:
+                service.events().delete(
+                    calendarId=CALENDAR_ID,
+                    eventId=g_event['id']
+                ).execute()
+                print(f"🗑️ Deleted event (no longer in Notion): {g_event.get('summary', 'Untitled')}")
+                deleted_count += 1
 
-    print(f"🔍 Found {len(synced_events)} previously synced events")
-
-    # Delete events whose notion_id is no longer in our Notion DB
-    for g_event in synced_events:
-        notion_id = g_event['extendedProperties']['private']['notion_id']
-        if notion_id not in notion_ids:
-            service.events().delete(
-                calendarId=CALENDAR_ID,
-                eventId=g_event['id']
-            ).execute()
-            print(f"🗑️ Deleted event (no longer in Notion): {g_event.get('summary', 'Untitled')}")
-            deleted_count += 1
-
-except Exception as e:
-    print(f"❌ Error during deletion sync: {e}")
+    except Exception as e:
+        print(f"❌ Error during deletion sync: {e}")
 
     print(f"""
-    🎉 Sync complete!
-    Created: {created_count}
-    Updated: {updated_count}
-    Skipped: {skipped_count}
-    Deleted: {deleted_count}
-    """)
+🎉 Sync complete!
+Created: {created_count}
+Updated: {updated_count}
+Skipped: {skipped_count}
+Deleted: {deleted_count}
+""")
+
 
 if __name__ == "__main__":
     sync_notion_to_calendar()
