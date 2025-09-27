@@ -120,38 +120,54 @@ def sync_notion_to_calendar():
         print(f"❌ Failed to connect to Google Calendar: {e}")
         return
 
-    synced_count = 0
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+
     for item in notion_items:
         try:
             event = notion_to_calendar_event(item)
             if not event:
                 print("⏭️  Skipping item without valid date")
+                skipped_count += 1
                 continue
 
-            # 🔎 Duplicate check using Notion ID
+            notion_id = item['id']
+            # Attach Notion ID to the event
+            event['extendedProperties'] = {
+                'private': {'notion_id': notion_id}
+            }
+
+            # Check if event already exists
             existing = service.events().list(
                 calendarId=CALENDAR_ID,
-                privateExtendedProperty=f"notion_id={item['id']}"
+                privateExtendedProperty=f"notion_id={notion_id}"
             ).execute().get('items', [])
 
             if existing:
-                print(f"⏭️  Event already exists for: {event['summary']}")
-                continue
-
-            # Create new event if not exists
-            created_event = service.events().insert(
-                calendarId=CALENDAR_ID,
-                body=event
-            ).execute()
-
-            print(f"✅ Created event: {event['summary']}")
-            synced_count += 1
+                # Update the existing event
+                existing_event_id = existing[0]['id']
+                updated_event = service.events().update(
+                    calendarId=CALENDAR_ID,
+                    eventId=existing_event_id,
+                    body=event
+                ).execute()
+                print(f"🔄 Updated event: {event['summary']}")
+                updated_count += 1
+            else:
+                # Create a new one
+                created_event = service.events().insert(
+                    calendarId=CALENDAR_ID,
+                    body=event
+                ).execute()
+                print(f"✅ Created event: {event['summary']}")
+                created_count += 1
 
         except Exception as e:
             print(f"❌ Error syncing item: {e}")
             continue
 
-    print(f"🎉 Sync complete! Created {synced_count} new events")
+    print(f"🎉 Sync complete! Created {created_count}, Updated {updated_count}, Skipped {skipped_count}")
 
 
 if __name__ == "__main__":
