@@ -104,7 +104,6 @@ def notion_to_calendar_event(notion_item):
 
 
 def sync_notion_to_calendar():
-    """Main sync function"""
     print("🔄 Starting Notion → Google Calendar sync...")
 
     notion_items = get_notion_items()
@@ -129,11 +128,22 @@ def sync_notion_to_calendar():
                 print("⏭️  Skipping item without valid date")
                 continue
 
-            # Always create new event (no duplicate check for now)
+            # 🔎 Duplicate check using Notion ID
+            existing = service.events().list(
+                calendarId=CALENDAR_ID,
+                privateExtendedProperty=f"notion_id={item['id']}"
+            ).execute().get('items', [])
+
+            if existing:
+                print(f"⏭️  Event already exists for: {event['summary']}")
+                continue
+
+            # Create new event if not exists
             created_event = service.events().insert(
                 calendarId=CALENDAR_ID,
                 body=event
             ).execute()
+
             print(f"✅ Created event: {event['summary']}")
             synced_count += 1
 
