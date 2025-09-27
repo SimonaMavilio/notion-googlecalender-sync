@@ -13,17 +13,19 @@ Works with all types of Notion date properties:
 - Runs automatically every 15 minutes via **GitHub Actions**
 - Secure credentials using **GitHub Secrets**
 - Works for any **google calendar** 
-- Designed for **free hosting**,  nothing else required
+- Designed for **free hosting**, nothing else required
+- Has **duplicate check** (prevent duplicate events when workflow reruns)
+- Bi-directional sync (Google Calendar ↔ Notion)
 
 ---
 
 ## Architecture Overview
 
 ```
-┌────────────┐        ┌──────────────┐        ┌────────────────┐
-│  Notion DB │ -----> │ GitHub Action│ -----> │ Google Calendar│
-└────────────┘        │  (sync.py)   │        └────────────────┘
-                      └──────────────┘
+┌────────────┐         ┌──────────────┐         ┌────────────────┐
+│  Notion DB │ <-----> │ GitHub Action│ <-----> │ Google Calendar│
+└────────────┘         │  (sync.py)   │         └────────────────┘
+                       └──────────────┘
 
 ```
 
@@ -87,8 +89,7 @@ To see workflow output:
 ---
 
 ## Future Roadmap
-- Add **duplicate check** (prevent duplicate events when workflow reruns)
-- Bi-directional sync (Google Calendar → Notion)
+
 - Automatic updates when Notion entries change
 - Richer logs (e.g. [All-day Event] vs [Timed Event])
 
