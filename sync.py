@@ -1,6 +1,7 @@
 import requests
 import json
 import os
+import sys
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -12,14 +13,39 @@ GOOGLE_CREDENTIALS_JSON = os.getenv('GOOGLE_CREDENTIALS')
 CALENDAR_ID = os.getenv('CALENDAR_ID', 'primary')
 
 
+def validate_env():
+    """Validate required environment variables are present and non-empty."""
+    missing = []
+    if not NOTION_TOKEN:
+        missing.append('NOTION_TOKEN')
+    if not NOTION_DB_ID:
+        missing.append('NOTION_DB_ID')
+    if not GOOGLE_CREDENTIALS_JSON:
+        missing.append('GOOGLE_CREDENTIALS')
+    if not CALENDAR_ID:
+        missing.append('CALENDAR_ID')
+
+    if missing:
+        print(f"❌ Missing required environment variables: {', '.join(missing)}")
+        print("Ensure GitHub Secrets are configured for these names.")
+        sys.exit(1)
+
+
 def get_google_calendar_service():
     """Initialize the Google Calendar API service"""
-    credentials_info = json.loads(GOOGLE_CREDENTIALS_JSON)
-    credentials = service_account.Credentials.from_service_account_info(
-        credentials_info,
-        scopes=['https://www.googleapis.com/auth/calendar']
-    )
-    return build('calendar', 'v3', credentials=credentials)
+    try:
+        credentials_info = json.loads(GOOGLE_CREDENTIALS_JSON)
+    except Exception as e:
+        raise RuntimeError(f"Failed to parse GOOGLE_CREDENTIALS JSON: {e}")
+
+    try:
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_info,
+            scopes=['https://www.googleapis.com/auth/calendar']
+        )
+        return build('calendar', 'v3', credentials=credentials)
+    except Exception as e:
+        raise RuntimeError(f"Failed to initialize Google Calendar client: {e}")
 
 
 def get_notion_items():
@@ -391,6 +417,9 @@ def sync_calendar_to_notion(service, notion_items):
 def main():
     """Main sync function - handles both directions"""
     print("🔄 Starting 2-Way Notion ↔ Google Calendar sync...")
+
+    # Validate configuration early to fail fast with clear error
+    validate_env()
 
     notion_items = get_notion_items()
     print(f"📋 Found {len(notion_items)} Notion items")
