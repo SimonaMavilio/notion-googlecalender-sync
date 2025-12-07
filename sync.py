@@ -52,25 +52,55 @@ def get_google_calendar_service():
 
 
 def get_notion_items():
-    """Fetch items from the Notion database"""
+    """Fetch all items from the Notion database (handles pagination)"""
     headers = {
         'Authorization': f'Bearer {NOTION_TOKEN}',
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json'
     }
 
-    response = requests.post(
-        f'https://api.notion.com/v1/databases/{NOTION_DB_ID}/query',
-        headers=headers,
-        json={}
-    )
+    all_items = []
+    next_cursor = None
+    page_count = 0
 
-    if response.status_code == 200:
-        return response.json().get('results', [])
-    else:
-        print(f"Error fetching Notion data: {response.status_code}")
-        print(response.text)
-        return []
+    while True:
+        page_count += 1
+        # Build request body with pagination cursor if available
+        request_body = {}
+        if next_cursor:
+            request_body['start_cursor'] = next_cursor
+
+        response = requests.post(
+            f'https://api.notion.com/v1/databases/{NOTION_DB_ID}/query',
+            headers=headers,
+            json=request_body
+        )
+
+        if response.status_code != 200:
+            print(f"❌ Error fetching Notion data: {response.status_code}")
+            print(response.text)
+            # Return what we have so far, or empty list if first page failed
+            if page_count == 1:
+                return []
+            break
+
+        data = response.json()
+        page_items = data.get('results', [])
+        all_items.extend(page_items)
+
+        # Check if there are more pages
+        has_more = data.get('has_more', False)
+        next_cursor = data.get('next_cursor')
+
+        if not has_more or not next_cursor:
+            break
+
+        print(f"📄 Fetched page {page_count} ({len(page_items)} items)...")
+
+    if page_count > 1:
+        print(f"📚 Pagination complete: fetched {page_count} pages, {len(all_items)} total items")
+    
+    return all_items
 
 
 def update_notion_page(page_id, title, start_date, end_date=None):
