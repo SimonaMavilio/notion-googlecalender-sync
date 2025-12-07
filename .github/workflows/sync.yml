@@ -32,4 +32,6 @@ jobs:
           NOTION_DB_ID: ${{ secrets.NOTION_DB_ID }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           CALENDAR_ID: ${{ secrets.CALENDAR_ID }}
+          NOTION_TITLE_PROPERTY: ${{ secrets.NOTION_TITLE_PROPERTY }}
+          NOTION_DATE_PROPERTY: ${{ secrets.NOTION_DATE_PROPERTY }}
         run: python sync.py

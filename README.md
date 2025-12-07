@@ -16,6 +16,7 @@ Works with all types of Notion date properties:
 - Designed for **free hosting**, nothing else required
 - Has **duplicate check** (prevent duplicate events when workflow reruns)
 - Bi-directional sync (Google Calendar ↔ Notion)
+- **Configurable property names** - Use any property names in your Notion database
 
 ---
 
@@ -32,7 +33,7 @@ Works with all types of Notion date properties:
 - **Notion DB** → Source of tasks/events
 - **GitHub Actions** → Runs `sync.py` every 6 hours
 - **Google Calendar** → Receives automatically created events
-- **Secrets** → Secure credentials (`NOTION_TOKEN`, `NOTION_DB_ID`, `GOOGLE_CREDENTIALS`, `CALENDAR_ID`)
+- **Secrets** → Secure credentials (`NOTION_TOKEN`, `NOTION_DB_ID`, `GOOGLE_CREDENTIALS`, `CALENDAR_ID`, plus optional property name overrides)
 
 ---
 
@@ -74,10 +75,10 @@ Your Notion database **must** have these two properties:
 
 | Property | Type   | Description                          |
 |----------|--------|--------------------------------------|
-| `Name`   | Title  | The event title (syncs to calendar)  |
-| `Date`   | Date   | The event date/time                  |
+| Title property | Title  | The event title (syncs to calendar)  |
+| Date property | Date   | The event date/time                  |
 
-> ⚠️ The property names must be exactly `Name` and `Date` (case-sensitive).
+> 💡 **Property names are configurable!** By default, the sync looks for properties named `Name` and `Date`. If your database uses different property names, you can configure them using GitHub Secrets (see step 4 below).
 
 ### 3. Google Calendar Setup
 
@@ -123,12 +124,27 @@ Your Notion database **must** have these two properties:
 
 Add the following secrets in your repo: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
 
+#### Required Secrets
+
 | Name                 | Value                                                    |
 |----------------------|----------------------------------------------------------|
 | `NOTION_TOKEN`       | Your Notion integration token (starts with `secret_...`) |
 | `NOTION_DB_ID`       | Your Notion database ID (32-character string)            |
 | `GOOGLE_CREDENTIALS` | The **entire JSON content** of the service account file  |
 | `CALENDAR_ID`        | `primary` or your full calendar ID                       |
+
+#### Optional Secrets (Property Names)
+
+If your Notion database uses different property names than `Name` and `Date`, you can configure them:
+
+| Name                    | Value                                    | Default |
+|-------------------------|------------------------------------------|---------|
+| `NOTION_TITLE_PROPERTY` | The name of your title property          | `Name`  |
+| `NOTION_DATE_PROPERTY`  | The name of your date property           | `Date`  |
+
+> 💡 **Example:** If your database uses `Event Name` and `Event Date` instead, set:
+> - `NOTION_TITLE_PROPERTY` = `Event Name`
+> - `NOTION_DATE_PROPERTY` = `Event Date`
 
 ---
 
@@ -138,11 +154,13 @@ To see workflow output:
 2. Click the recent run → expand the **Run sync** step
 3. You’ll see logs like:
    ```
-   🔄 Starting Notion → Google Calendar sync...
+   🔄 Starting 2-Way Notion ↔ Google Calendar sync...
+   📝 Using property names: Title='Name', Date='Date'
    📋 Found 10 Notion items
-   ✅ Created event: Meeting with Client
-   ⏭️  Skipping item without valid date
-   🎉 Sync complete! Created 5 new events
+   🔄 Syncing Notion → Google Calendar...
+   ✅ Created calendar event: Meeting with Client
+   ⏭️ Skipping item without valid date
+   🎉 2-Way Sync Complete!
    ```
 
 ---

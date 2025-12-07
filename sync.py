@@ -11,6 +11,9 @@ NOTION_TOKEN = os.getenv('NOTION_TOKEN')
 NOTION_DB_ID = os.getenv('NOTION_DB_ID')
 GOOGLE_CREDENTIALS_JSON = os.getenv('GOOGLE_CREDENTIALS')
 CALENDAR_ID = os.getenv('CALENDAR_ID', 'primary')
+# Configurable property names (optional, defaults to 'Name' and 'Date' for backward compatibility)
+NOTION_TITLE_PROPERTY = os.getenv('NOTION_TITLE_PROPERTY', 'Name')
+NOTION_DATE_PROPERTY = os.getenv('NOTION_DATE_PROPERTY', 'Date')
 
 
 def validate_env():
@@ -85,10 +88,10 @@ def update_notion_page(page_id, title, start_date, end_date=None):
 
     data = {
         'properties': {
-            'Name': {
+            NOTION_TITLE_PROPERTY: {
                 'title': [{'text': {'content': title}}]
             },
-            'Date': {
+            NOTION_DATE_PROPERTY: {
                 'date': date_property
             }
         }
@@ -118,10 +121,10 @@ def create_notion_page(title, start_date, end_date=None, gcal_event_id=None):
     data = {
         'parent': {'database_id': NOTION_DB_ID},
         'properties': {
-            'Name': {
+            NOTION_TITLE_PROPERTY: {
                 'title': [{'text': {'content': title}}]
             },
-            'Date': {
+            NOTION_DATE_PROPERTY: {
                 'date': date_property
             }
         }
@@ -187,8 +190,8 @@ def notion_to_calendar_event(notion_item):
 
     # Extract title
     title = "Untitled Event"
-    if 'Name' in properties:
-        title_prop = properties['Name']
+    if NOTION_TITLE_PROPERTY in properties:
+        title_prop = properties[NOTION_TITLE_PROPERTY]
         if title_prop['type'] == 'title' and title_prop['title']:
             title = title_prop['title'][0]['plain_text']
 
@@ -197,8 +200,8 @@ def notion_to_calendar_event(notion_item):
     end_time = None
     is_all_day = False
 
-    if 'Date' in properties:
-        date_prop = properties['Date']
+    if NOTION_DATE_PROPERTY in properties:
+        date_prop = properties[NOTION_DATE_PROPERTY]
         if date_prop['type'] == 'date' and date_prop['date']:
             start_time = date_prop['date']['start']
             end_time = date_prop['date'].get('end')
@@ -388,8 +391,8 @@ def sync_calendar_to_notion(service, notion_items):
 
             # Get current values from Notion
             notion_title = "Untitled Event"
-            if 'Name' in notion_item['properties']:
-                title_prop = notion_item['properties']['Name']
+            if NOTION_TITLE_PROPERTY in notion_item['properties']:
+                title_prop = notion_item['properties'][NOTION_TITLE_PROPERTY]
                 if title_prop['type'] == 'title' and title_prop['title']:
                     notion_title = title_prop['title'][0]['plain_text']
 
@@ -417,6 +420,7 @@ def sync_calendar_to_notion(service, notion_items):
 def main():
     """Main sync function - handles both directions"""
     print("🔄 Starting 2-Way Notion ↔ Google Calendar sync...")
+    print(f"📝 Using property names: Title='{NOTION_TITLE_PROPERTY}', Date='{NOTION_DATE_PROPERTY}'")
 
     # Validate configuration early to fail fast with clear error
     validate_env()
