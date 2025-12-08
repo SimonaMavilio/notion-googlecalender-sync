@@ -214,6 +214,20 @@ def gcal_event_to_notion_date(gcal_event):
     return None, None
 
 
+def notion_item_to_date(notion_item):
+    """Extract date values from a Notion item"""
+    properties = notion_item.get('properties', {})
+    
+    if NOTION_DATE_PROPERTY in properties:
+        date_prop = properties[NOTION_DATE_PROPERTY]
+        if date_prop['type'] == 'date' and date_prop['date']:
+            start_date = date_prop['date']['start']
+            end_date = date_prop['date'].get('end')
+            return start_date, end_date
+    
+    return None, None
+
+
 def notion_to_calendar_event(notion_item):
     """Convert a Notion item to a Google Calendar event"""
     properties = notion_item.get('properties', {})
@@ -426,17 +440,38 @@ def sync_calendar_to_notion(service, notion_items):
                 if title_prop['type'] == 'title' and title_prop['title']:
                     notion_title = title_prop['title'][0]['plain_text']
 
+            notion_start, notion_end = notion_item_to_date(notion_item)
+
             # Get calendar event values
             gcal_title = gcal_event.get('summary', 'Untitled Event')
             gcal_start, gcal_end = gcal_event_to_notion_date(gcal_event)
 
-            # Check if we need to update Notion
+            # Check if we need to update Notion (compare both title and dates)
             needs_update = False
+            changes = []
+
+            # Compare title
             if gcal_title != notion_title:
                 needs_update = True
-                print(f"📝 Title changed: '{notion_title}' → '{gcal_title}'")
+                changes.append(f"title: '{notion_title}' → '{gcal_title}'")
 
-            if gcal_start and needs_update:
+            # Compare start date - normalize None to empty string for comparison
+            notion_start_normalized = notion_start or ""
+            gcal_start_normalized = gcal_start or ""
+            if gcal_start_normalized != notion_start_normalized:
+                needs_update = True
+                changes.append(f"start date: '{notion_start or '(none)'}' → '{gcal_start or '(none)'}'")
+
+            # Compare end date - normalize None to empty string for comparison
+            notion_end_normalized = notion_end or ""
+            gcal_end_normalized = gcal_end or ""
+            if gcal_end_normalized != notion_end_normalized:
+                needs_update = True
+                changes.append(f"end date: '{notion_end or '(none)'}' → '{gcal_end or '(none)'}'")
+
+            if needs_update and gcal_start:
+                change_desc = ", ".join(changes)
+                print(f"📝 Changes detected: {change_desc}")
                 if update_notion_page(notion_id, gcal_title, gcal_start, gcal_end):
                     print(f"🔄 Updated Notion page: {gcal_title}")
                     updated_count += 1

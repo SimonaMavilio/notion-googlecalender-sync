@@ -15,8 +15,11 @@ Works with all types of Notion date properties:
 - Works for any **google calendar** 
 - Designed for **free hosting**, nothing else required
 - Has **duplicate check** (prevent duplicate events when workflow reruns)
-- Bi-directional sync (Google Calendar ↔ Notion)
+- **Bi-directional sync** (Google Calendar ↔ Notion)
+  - Syncs title and date changes in both directions
+  - Automatically detects and syncs changes from either source
 - **Configurable property names** - Use any property names in your Notion database
+- **Pagination support** - Handles databases with hundreds or thousands of items
 
 ---
 
@@ -163,6 +166,9 @@ To see workflow output:
    🔄 Syncing Notion → Google Calendar...
    ✅ Created calendar event: Meeting with Client
    ⏭️ Skipping item without valid date
+   🔄 Syncing Google Calendar → Notion...
+   📝 Changes detected: start date: '2024-01-15' → '2024-01-20', end date: '2024-01-15' → '2024-01-20'
+   🔄 Updated Notion page: Team Meeting
    🎉 2-Way Sync Complete!
    ```
 
