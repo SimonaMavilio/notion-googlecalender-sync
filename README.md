@@ -4,7 +4,7 @@ Automated sync from a Notion database into Google Calendar using **Python + GitH
 Works with all types of Notion date properties:
 - All-day events (single day)
 - All-day events (multi-day)
-- Events with a start time (end = +1h by default)
+- Events with a start time only (creates 0-duration events in Google Calendar)
 - Events with start and end times
 
 ---

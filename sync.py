@@ -273,13 +273,9 @@ def notion_to_calendar_event(notion_item):
     else:
         # Case: has time
         if not end_time:
-            # If only a start time exists, set end = start + 1 hour
-            try:
-                dt_start = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-                dt_end = dt_start + timedelta(hours=1)
-                end_time = dt_end.isoformat()
-            except:
-                end_time = start_time
+            # If only a start time exists, set end = start (0-duration event)
+            # This preserves the "start time only" behavior from Notion
+            end_time = start_time
 
         event['start'] = {'dateTime': start_time}
         event['end'] = {'dateTime': end_time}
