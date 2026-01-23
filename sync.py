@@ -270,6 +270,11 @@ def notion_to_calendar_event(notion_item):
                     # if no end date → set end = start + 1 day
                     end_date = datetime.strptime(start_time, "%Y-%m-%d") + timedelta(days=1)
                     end_time = end_date.strftime("%Y-%m-%d")
+                else:
+                    # Notion end dates are inclusive, Google Calendar end dates are exclusive
+                    # So we need to add 1 day to the Notion end date for Google Calendar
+                    end_date = datetime.strptime(end_time, "%Y-%m-%d") + timedelta(days=1)
+                    end_time = end_date.strftime("%Y-%m-%d")
 
     if not start_time:
         return None
