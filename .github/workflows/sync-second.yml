@@ -1,16 +1,16 @@
-name: Notion-Calendar Sync (Tasks)
+name: Notion-Calendar Sync (Lessons)
 
 on:
   workflow_dispatch: {}
   schedule:
-    # Runs every hour (cron is UTC)
-    - cron: "0 * * * *"
+    # Runs once per day at 00:00 UTC
+    - cron: "0 0 * * *"
 
 jobs:
-  sync:
+  sync-second:
     runs-on: ubuntu-latest
     concurrency:
-      group: notion-gcal-sync
+      group: notion-gcal-sync-2
       cancel-in-progress: true
     steps:
       - name: Checkout code
@@ -26,12 +26,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run sync
+      - name: Run sync for second DB
         env:
+          # shared between both workflows
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
-          NOTION_DB_ID: ${{ secrets.NOTION_DB_ID }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
-          CALENDAR_ID: ${{ secrets.CALENDAR_ID }}
-          NOTION_TITLE_PROPERTY: ${{ secrets.NOTION_TITLE_PROPERTY }}
-          NOTION_DATE_PROPERTY: ${{ secrets.NOTION_DATE_PROPERTY }}
+          # specific to the second Notion DB and Calendar
+          NOTION_DB_ID: ${{ secrets.NOTION_DB_ID_2 }}
+          CALENDAR_ID: ${{ secrets.CALENDAR_ID_2 }}
+          NOTION_TITLE_PROPERTY: ${{ secrets.NOTION_TITLE_PROPERTY_2 }}
+          NOTION_DATE_PROPERTY: ${{ secrets.NOTION_DATE_PROPERTY_2 }}
         run: python sync.py
+
