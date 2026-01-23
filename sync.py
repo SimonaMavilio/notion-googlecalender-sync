@@ -241,16 +241,26 @@ def notion_item_to_date(notion_item):
     return None, None
 
 
+def extract_notion_title(notion_item):
+    """Extract full title from a Notion item, concatenating all title segments"""
+    properties = notion_item.get('properties', {})
+    
+    if NOTION_TITLE_PROPERTY in properties:
+        title_prop = properties[NOTION_TITLE_PROPERTY]
+        if title_prop['type'] == 'title' and title_prop['title']:
+            # Concatenate all title segments (Notion titles can have multiple rich text objects)
+            title_parts = [segment.get('plain_text', '') for segment in title_prop['title']]
+            return ''.join(title_parts)
+    
+    return "Untitled Event"
+
+
 def notion_to_calendar_event(notion_item):
     """Convert a Notion item to a Google Calendar event"""
     properties = notion_item.get('properties', {})
 
-    # Extract title
-    title = "Untitled Event"
-    if NOTION_TITLE_PROPERTY in properties:
-        title_prop = properties[NOTION_TITLE_PROPERTY]
-        if title_prop['type'] == 'title' and title_prop['title']:
-            title = title_prop['title'][0]['plain_text']
+    # Extract title (concatenating all segments)
+    title = extract_notion_title(notion_item)
 
     # Extract date(s)
     start_time = None
@@ -480,11 +490,7 @@ def sync_calendar_to_notion(service, notion_items):
                 continue
 
             # Get current values from Notion
-            notion_title = "Untitled Event"
-            if NOTION_TITLE_PROPERTY in notion_item['properties']:
-                title_prop = notion_item['properties'][NOTION_TITLE_PROPERTY]
-                if title_prop['type'] == 'title' and title_prop['title']:
-                    notion_title = title_prop['title'][0]['plain_text']
+            notion_title = extract_notion_title(notion_item)
 
             notion_start, notion_end = notion_item_to_date(notion_item)
 
