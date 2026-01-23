@@ -16,6 +16,19 @@ NOTION_TITLE_PROPERTY = os.getenv('NOTION_TITLE_PROPERTY', 'Name')
 NOTION_DATE_PROPERTY = os.getenv('NOTION_DATE_PROPERTY', 'Date')
 
 
+def parse_iso_datetime(value):
+    """Parse ISO/RFC3339 timestamps from Notion/Google into aware datetimes."""
+    if not value:
+        return None
+    try:
+        # Handle trailing 'Z' as UTC
+        if isinstance(value, str) and value.endswith('Z'):
+            value = value[:-1] + '+00:00'
+        return datetime.fromisoformat(value)
+    except Exception:
+        return None
+
+
 def validate_env():
     """Validate required environment variables are present and non-empty."""
     missing = []
@@ -312,8 +325,23 @@ def sync_notion_to_calendar(service, notion_items, notion_ids):
             ).execute().get('items', [])
 
             if existing:
-                # Update
-                existing_event_id = existing[0]['id']
+                # Update only if Notion is newer than the existing calendar event
+                existing_event = existing[0]
+                existing_event_id = existing_event['id']
+
+                notion_last_edited = parse_iso_datetime(item.get('last_edited_time'))
+                gcal_last_updated = parse_iso_datetime(existing_event.get('updated'))
+
+                if notion_last_edited and gcal_last_updated and notion_last_edited <= gcal_last_updated:
+                    # Calendar is newer or same; skip overwriting it from an older Notion value
+                    print(
+                        "⏭️ Skipping Notion → Calendar update "
+                        f"(calendar newer or same) for: {event['summary']} "
+                        f"(Notion last_edited={notion_last_edited}, "
+                        f"Calendar updated={gcal_last_updated})"
+                    )
+                    continue
+
                 service.events().update(
                     calendarId=CALENDAR_ID,
                     eventId=existing_event_id,
@@ -429,6 +457,23 @@ def sync_calendar_to_notion(service, notion_items):
             # Compare calendar event with Notion page and update if needed
             notion_item = notion_map[notion_id]
 
+            # Decide direction using last-edited timestamps:
+            # - Notion uses page['last_edited_time']
+            # - Google Calendar uses event['updated']
+            notion_last_edited = parse_iso_datetime(notion_item.get('last_edited_time'))
+            gcal_last_updated = parse_iso_datetime(gcal_event.get('updated'))
+
+            # If Notion is newer or same, do NOT overwrite it from Calendar
+            if notion_last_edited and gcal_last_updated and notion_last_edited >= gcal_last_updated:
+                # Let the later Notion change win; skip Calendar → Notion for this item
+                print(
+                    "⏭️ Skipping Calendar → Notion update "
+                    f"(Notion newer or same) for: {gcal_event.get('summary', 'Untitled Event')} "
+                    f"(Notion last_edited={notion_last_edited}, "
+                    f"Calendar updated={gcal_last_updated})"
+                )
+                continue
+
             # Get current values from Notion
             notion_title = "Untitled Event"
             if NOTION_TITLE_PROPERTY in notion_item['properties']:
@@ -486,26 +531,30 @@ def main():
     # Validate configuration early to fail fast with clear error
     validate_env()
 
-    notion_items = get_notion_items()
-    print(f"📋 Found {len(notion_items)} Notion items")
-
-    notion_ids = set(item['id'] for item in notion_items)
-
     try:
         service = get_google_calendar_service()
         print("🔗 Connected to Google Calendar")
     except Exception as e:
         print(f"❌ Failed to connect to Google Calendar: {e}")
         return
-
-    # Sync Notion → Google Calendar
-    n2c_created, n2c_updated, n2c_skipped, n2c_deleted = sync_notion_to_calendar(
-        service, notion_items, notion_ids
-    )
-
-    # Sync Google Calendar → Notion
+    
+    # First, sync changes from Google Calendar → Notion so that
+    # manual edits in Google Calendar win over older Notion values.
+    notion_items = get_notion_items()
+    print(f"📋 Found {len(notion_items)} Notion items")
     c2n_created, c2n_updated, c2n_deleted = sync_calendar_to_notion(
         service, notion_items
+    )
+
+    # Re-fetch Notion after Calendar → Notion sync so we use the
+    # latest values (including any updates that came from Calendar)
+    notion_items = get_notion_items()
+    print(f"📋 Found {len(notion_items)} Notion items after Calendar → Notion sync")
+    notion_ids = set(item['id'] for item in notion_items)
+
+    # Then sync Notion → Google Calendar using the refreshed data
+    n2c_created, n2c_updated, n2c_skipped, n2c_deleted = sync_notion_to_calendar(
+        service, notion_items, notion_ids
     )
 
     print(f"""

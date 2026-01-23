@@ -40,6 +40,19 @@ Works with all types of Notion date properties:
 
 ---
 
+## Sync behavior and conflict resolution
+
+- The sync runs in **both directions** every hour:
+  - **Google Calendar → Notion** (applies changes from calendar events into Notion pages)
+  - **Notion → Google Calendar** (applies changes from Notion pages into calendar events)
+- For events already linked between Notion and Google Calendar, a **“last edit wins”** rule is used:
+  - Each Notion page has a `last_edited_time`
+  - Each Google Calendar event has an `updated` timestamp
+  - When there’s a difference, the side with the **newer timestamp** overwrites the older one
+  - This lets you safely edit dates and titles **from either Notion or Google Calendar** without them being immediately reverted by the sync
+
+---
+
 ## 🛠Setup Instructions
 
 ### 1. Fork and Clone this repository
