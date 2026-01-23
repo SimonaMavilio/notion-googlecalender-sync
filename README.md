@@ -10,7 +10,7 @@ Works with all types of Notion date properties:
 ---
 
 ## Features
-- Runs automatically every 6 hours via **GitHub Actions**
+- Runs automatically every hour via **GitHub Actions**
 - Secure credentials using **GitHub Secrets**
 - Works for any **google calendar** 
 - Designed for **free hosting**, nothing else required
@@ -34,7 +34,7 @@ Works with all types of Notion date properties:
 ```
 
 - **Notion DB** → Source of tasks/events
-- **GitHub Actions** → Runs `sync.py` every 6 hours
+- **GitHub Actions** → Runs `sync.py` every hour
 - **Google Calendar** → Receives automatically created events
 - **Secrets** → Secure credentials (`NOTION_TOKEN`, `NOTION_DB_ID`, `GOOGLE_CREDENTIALS`, `CALENDAR_ID`, plus optional property name overrides)
 
