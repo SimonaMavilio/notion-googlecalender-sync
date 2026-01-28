@@ -1,0 +1,36 @@
+name: Notion-Calendar Sync (Lessons – Notion button)
+
+on:
+  repository_dispatch:
+    types: [run-lessons-sync]
+
+jobs:
+  sync-lessons-manual:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: notion-gcal-sync-lessons-manual
+      cancel-in-progress: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run lessons sync
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          NOTION_DB_ID: ${{ secrets.NOTION_DB_ID_2 }}
+          CALENDAR_ID: ${{ secrets.CALENDAR_ID_2 }}
+          NOTION_TITLE_PROPERTY: ${{ secrets.NOTION_TITLE_PROPERTY_2 }}
+          NOTION_DATE_PROPERTY: ${{ secrets.NOTION_DATE_PROPERTY_2 }}
+        run: python sync.py
+
